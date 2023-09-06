@@ -36,6 +36,7 @@ class Text2MotionDataset(data.Dataset):
             self.max_motion_length = 26 if unit_length == 8 else 51
             dim_pose = 263
             kinematic_chain = paramUtil.t2m_kinematic_chain
+            
         elif dataset_name == 'kit':
             self.data_root = './dataset/KIT-ML'
             self.motion_dir = pjoin(self.data_root, 'new_joint_vecs')
@@ -77,9 +78,14 @@ class Text2MotionDataset(data.Dataset):
                             to_tag = float(line_split[3])
                             f_tag = 0.0 if np.isnan(f_tag) else f_tag
                             to_tag = 0.0 if np.isnan(to_tag) else to_tag
-
+                            
+                            #print(t_tokens,'t_tokens') #['a/DET', 'person/NOUN', 'get/VERB', 'push/VERB', 'backwards/ADV']
+                            
                             text_dict['caption'] = caption
-                            text_dict['tokens'] = t_tokens
+                            text_dict['tokens'] = t_tokens 
+                            text_dict['verbs'] = self.extract_verbs_from_t_token(t_tokens)
+                            #print(text_dict['verbs'])
+                            #text_dict[]
                             if f_tag == 0.0 and to_tag == 0.0:
                                 flag = True
                                 text_data.append(text_dict)
@@ -105,6 +111,19 @@ class Text2MotionDataset(data.Dataset):
         self.data_dict = data_dict
         self.name_list = new_name_list
 
+    def extract_verbs_from_t_token(self, t_token):
+        
+        verbs = []
+        for token in t_token:
+            parts = token.split('/')
+            if len(parts) == 2 and parts[1] == 'VERB':
+                verbs.append(parts[0])
+        if len(verbs)==0:
+            verbs.append('unk')
+
+        verbs = ' '.join(verbs)
+        return verbs
+
     def __len__(self):
         return len(self.data_dict)
 
@@ -114,9 +133,14 @@ class Text2MotionDataset(data.Dataset):
         m_tokens = random.choice(m_token_list)
 
         text_data = random.choice(text_list)
-        caption= text_data['caption']
+        caption= text_data['caption']#[0]
+        verbs = text_data['verbs']
+        #word_tokens= text_data['tokens']
+        #verbs = self.extract_verbs_from_t_token(word_tokens)
+        #print(caption,'caption')
+        #verbs= text_data['caption'][1]
 
-        
+        #print(verbs,'verbs')
         coin = np.random.choice([False, False, True])
         # print(len(m_tokens))
         if coin:
@@ -133,7 +157,7 @@ class Text2MotionDataset(data.Dataset):
         else:
             m_tokens = np.concatenate([m_tokens, np.ones((1), dtype=int) * self.mot_end_idx], axis=0)
 
-        return caption, m_tokens.reshape(-1), m_tokens_len
+        return caption, m_tokens.reshape(-1), m_tokens_len, verbs
 
 
 

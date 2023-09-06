@@ -7,7 +7,8 @@ from os.path import join as pjoin
 from torch.distributions import Categorical
 import json
 import clip
-
+import torch.nn.functional as F
+import torch.nn as nn
 import options.option_transformer as option_trans
 import models.vqvae as vqvae
 import utils.utils_model as utils_model
@@ -99,6 +100,20 @@ nb_iter, avg_loss_cls, avg_acc = 0, 0., 0.
 right_num = 0
 nb_sample_train = 0
 
+class MLP(nn.Module):
+    def __init__(self, input_size):
+        super(MLP, self).__init__()
+        self.fc1 = nn.Linear(input_size, 310)  # 예시로 hidden layer 크기는 512로 설정 
+        # humanML -> 310이랑 매치 하지 않을 수 있음 (수정 필요)
+        #self.fc2 = nn.Linear(513, output_size)
+
+    def forward(self, x):
+        x = F.sigmoid(self.fc1(x))
+        #x = self.fc1(x)
+        return x
+    
+mlp_model = MLP(513).cuda()
+
 ##### ---- get code ---- #####
 for batch in train_loader_token:
     pose, name = batch
@@ -109,23 +124,53 @@ for batch in train_loader_token:
     target = target.cpu().numpy()
     np.save(pjoin(args.vq_dir, name[0] +'.npy'), target)
 
-
+vocabulary_dict={'swim': 0, 'convulse': 1, 'drank': 2, 'lunge': 3, 'counterclockwise': 4, 'weigh': 5, 'begin': 6, 'land': 7, 'descend': 8, 'gain': 9, 'carry': 10, 'look': 11, 'dribble': 12, 'stabilize': 13, 'define': 14, 'stroll': 15, 'drag': 16, 'stomach': 17, 'remain': 18, 'balance': 19, 'sink': 20, 'side': 21, 'hike': 22, 'ist': 23, 'speed': 24, 'come': 25, 'box': 26, 'stir': 27, 'hang': 28, 'wake': 
+29, 'tumble': 30, 'catch': 31, 'clean': 32, 'help': 33, 'flutter': 34, 'predefine': 35, 'swinge': 36, 'swing': 37, 'show': 38, 'can': 39, 'feel': 40, 'open': 41, 'stretch': 42, 'regain': 43, 'shove': 44, 'zoom': 45, 'fight': 46, 'spread': 47, 'defeat': 48, 'balk': 49, 'stumble': 50, 'return': 51, 'dig': 52, 'flex': 53, 'kick': 54, 'block': 55, 'steer': 56, 'rebalance': 57, 'lurch': 58, 'knee': 59, 'inspect': 60, 'change': 61, 'drink': 62, 'wait': 63, 'wave': 64, 'collapse': 65, 'raise': 66, 'stetche': 67, 'bang': 68, 'wipe': 69, 'drum': 70, 'shoot': 71, 'avoid': 72, 'hit': 73, 'retreat': 74, 'strike': 75, 'lurk': 76, 'protect': 77, 'overstep': 78, 'step': 79, 'point': 80, 'shake': 81, 'imitate': 82, 'loosen': 83, 'wawe': 84, 'absorb': 85, 'kneel': 86, 'start': 87, 'support': 88, 'move': 89, 'happen': 90, 'strumble': 91, 'play': 92, 'correct': 93, 'toss': 94, 'visit': 95, 'lefthande': 96, 'accelerate': 97, 'bounce': 98, 'rest': 99, 'seem': 100, 'paddle': 101, 'energize': 102, 'lose': 103, 'hobble': 104, 'punch': 105, 'shrug': 106, 'outstreche': 107, 'leftside': 108, 'sit': 109, 'miss': 110, 'compensate': 111, 'sway': 112, 'wald': 113, 'shout': 114, 'stopd': 115, 'curve': 116, 'wag': 117, 'waltz': 118, 'fast': 119, 'give': 120, 'dance': 121, 'drift': 122, 'stove': 123, 'sideward': 124, 'need': 125, 'omethe': 126, 'fold': 127, 'maintain': 128, 'tilt': 129, 'serve': 130, 'trip': 131, 'tae': 132, 'pivot': 133, 'greet': 134, 'stumbel': 135, 'turn': 136, 'go': 137, 'grip': 138, 'roll': 139, 'appear': 140, 'run': 141, 'balace': 142, 'pat': 143, 'react': 144, 'face': 145, 'interact': 146, 'stare': 147, 'throw': 148, 'laugh': 149, 'clap': 150, 'ture': 151, 'slip': 152, 'shuffle': 153, 'object': 154, 'call': 155, 'alcoholize': 156, 'dodge': 157, 'push': 158, 'pass': 159, 'perturbation': 160, 'againgst': 161, 'assume': 162, 'streche': 163, 'golf': 164, 'sprint': 165, 'whip': 166, 'stop': 167, 'avaoid': 168, 'stroke': 169, 'alternate': 170, 'fall': 171, 'decelerate': 172, 'skateboard': 173, 'extend': 174, 'strirre': 175, 'dangle': 176, 'complete': 177, 'describe': 178, 'beat': 179, 'hold': 180, 'keep': 181, 'put': 182, 'exercise': 183, 'rub': 184, 'flap': 185, 'chest': 186, 'continue': 187, 'wiggle': 188, 'perform': 189, 'walk': 190, 'lower': 191, 'bhind': 192, 'shave': 193, 'squat': 194, 'wawve': 195, 'slap': 196, 'resemble': 197, 'bring': 198, 'crouch': 199, 'jogg': 200, 'counterbalance': 201, 'suggest': 202, 'scream': 203, 'cast': 204, 'crawl': 205, 'beee': 206, 'pour': 207, 'evade': 208, 'prop': 209, 'rise': 210, 'sideware': 211, 'end': 212, 'set': 213, 'bore': 214, 'righthande': 215, 'may': 216, 'watch': 217, 'trurn': 218, 'place': 219, 'person': 220, 'sand': 221, 'mirror': 222, 'pick': 223, 'clockwise': 224, 'search': 225, 'brakedance': 226, 'dwadle': 227, 'shovel': 228, 'eat': 229, 'lay': 230, 'prepare': 231, 'lean': 232, 'kneee': 233, 'rightside': 234, 'try': 235, 'find': 236, 
+'puche': 237, 'follow': 238, 'outstretche': 239, 'spin': 240, 'close': 241, 'recover': 242, 'tip': 243, 'form': 244, 'take': 245, 'salute': 246, 'proceed': 247, 'cartwheel': 248, 'bow': 249, 'stand': 250, 'write': 251, 'jog': 252, 'wippe': 253, 'have': 254, 'stomp': 255, 'strum': 256, 'duck': 257, 'rotate': 258, 'mimic': 259, 'sneak': 260, 'perfom': 261, 'tour': 262, 'yanks': 263, 'bump': 264, 'get': 265, 'forward': 266, 'stamp': 267, 'draw': 268, 'sidestep': 269, 'lead': 270, 'disappear': 271, 'let': 272, 'sidekick': 273, 'smash': 274, 'impersonate': 275, 'unk': 276, 'obove': 277, 'want': 278, 'stay': 279, 'bend': 280, 'receive': 281, 'wish': 282, 'resume': 283, 'forwards': 284, 'back': 285, 'lift': 286, 'cross': 287, 'slow': 288, 'indicate': 289, 'climb': 290, 'left': 291, 'touch': 292, 'hand': 293, 'wlak': 294, 'lie': 295, 'hop': 296, 'jump': 297, 'use': 298, 'practice': 299, 'do': 300, 'know': 301, 'perfome': 302, 'continuos': 303, 'tap': 304, 'hurry': 305, 'reach': 306, 'saw': 307, 'make': 308, 'knock': 309}
 train_loader = dataset_TM_train.DATALoader(args.dataname, args.batch_size, args.nb_code, args.vq_name, unit_length=2**args.down_t)
 train_loader_iter = dataset_TM_train.cycle(train_loader)
 
-        
+word_set = set()        
 ##### ---- Training ---- #####
 best_fid, best_iter, best_div, best_top1, best_top2, best_top3, best_matching, writer, logger = eval_trans.evaluation_transformer(args.out_dir, val_loader, net, trans_encoder, logger, writer, 0, best_fid=1000, best_iter=0, best_div=100, best_top1=0, best_top2=0, best_top3=0, best_matching=100, clip_model=clip_model, eval_wrapper=eval_wrapper)
 while nb_iter <= args.total_iter:
     
     batch = next(train_loader_iter)
-    clip_text, m_tokens, m_tokens_len = batch
+    clip_text, m_tokens, m_tokens_len, verbs = batch
     m_tokens, m_tokens_len = m_tokens.cuda(), m_tokens_len.cuda()
     bs = m_tokens.shape[0]
     target = m_tokens    # (bs, 26)
     target = target.cuda()
+    label_data = []
+
+    for sentence in verbs:
+        sentence_indices = []
+        for word in sentence.split():
+            if word in vocabulary_dict:
+                sentence_indices.append(vocabulary_dict[word])
+        label_data.append(sentence_indices)
     
-    text = clip.tokenize(clip_text, truncate=True).cuda()
+    label_onehot = []
+    num_labels=310
+
+    for labels in label_data:
+        onehot = np.zeros(num_labels)
+        onehot[labels] = 1
+        label_onehot.append(onehot)
+    label_onehot = np.array(label_onehot)
+    label_tensor = torch.tensor(label_onehot).float().cuda()
+    #print(label_tensor)
+    #for words in verbs:
+    #    for word in words.split():  # 공백을 기준으로 단어 분리
+    #        word_set.add(word)
+    #print(len(word_set),'len(word_set)')
+    #print(word_set,'verbs')
+    #print(len(target),'len(target)')
+    #print(bs,'bs')
+    #print(len(clip_text),'len_verbs')
+    #print(len(verbs),'len_verbs')
+
+    text = clip.tokenize(clip_text).cuda()
     
     feat_clip_text = clip_model.encode_text(text).float()
 
@@ -143,6 +188,14 @@ while nb_iter <= args.total_iter:
     a_indices = mask*input_index+(1-mask)*r_indices
 
     cls_pred = trans_encoder(a_indices, feat_clip_text)
+    final_feature = cls_pred[:,-1,:]
+    final_logit = mlp_model(final_feature).cuda()
+    #print(label_tensor.shape,'label_tensor.shape')
+    #print(final_logit.shape,'final_logit.shape')
+    
+    #print(final_logit.shape,'final_logit.shape')
+    #print(cls_pred.shape,'cls_pred.shape') #(30,51,513)   
+
     cls_pred = cls_pred.contiguous()
 
     loss_cls = 0.0
@@ -160,7 +213,10 @@ while nb_iter <= args.total_iter:
             dist = Categorical(probs)
             cls_pred_index = dist.sample()
         right_num += (cls_pred_index.flatten(0) == target[i][:m_tokens_len[i] + 1].flatten(0)).sum().item()
-
+    
+    multilabel_loss = F.binary_cross_entropy(final_logit, label_tensor)
+    
+    loss_cls = loss_cls + multilabel_loss
     ## global loss
     optimizer.zero_grad()
     loss_cls.backward()
