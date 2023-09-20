@@ -7,7 +7,8 @@ import models.pos_encoding as pos_encoding
 
 class Text2Motion_Transformer(nn.Module):
 
-    def __init__(self, 
+    def __init__(self,
+                pre_trained_codebook,
                 num_vq=1024, 
                 embed_dim=512, 
                 clip_dim=512, 
@@ -17,7 +18,7 @@ class Text2Motion_Transformer(nn.Module):
                 drop_out_rate=0.1, 
                 fc_rate=4):
         super().__init__()
-        self.trans_base = CrossCondTransBase(num_vq, embed_dim, clip_dim, block_size, num_layers, n_head, drop_out_rate, fc_rate)
+        self.trans_base = CrossCondTransBase(pre_trained_codebook, num_vq, embed_dim, clip_dim, block_size, num_layers, n_head, drop_out_rate, fc_rate)
         self.trans_head = CrossCondTransHead(num_vq, embed_dim, block_size, num_layers, n_head, drop_out_rate, fc_rate)
         self.block_size = block_size
         self.num_vq = num_vq
@@ -117,7 +118,8 @@ class Block(nn.Module):
 
 class CrossCondTransBase(nn.Module):
 
-    def __init__(self, 
+    def __init__(self,
+                pre_trained_codebook,
                 num_vq=1024, 
                 embed_dim=512, 
                 clip_dim=512, 
@@ -127,18 +129,19 @@ class CrossCondTransBase(nn.Module):
                 drop_out_rate=0.1, 
                 fc_rate=4):
         super().__init__()
-        self.tok_emb = nn.Embedding(num_vq + 2, embed_dim)
-        self.cond_emb = nn.Linear(clip_dim, embed_dim)
+        self.tok_emb = nn.Embedding(num_vq + 2, embed_dim) ## the range of idx: num_vq +2, embed_dim : each idx'values (vectors) range (length)
+        self.cond_emb = nn.Linear(clip_dim, embed_dim) ## output tensor of shape: (batch_size, enbed_dim)
         self.pos_embedding = nn.Embedding(block_size, embed_dim)
         self.drop = nn.Dropout(drop_out_rate)
         # transformer block
         self.blocks = nn.Sequential(*[Block(embed_dim, block_size, n_head, drop_out_rate, fc_rate) for _ in range(num_layers)])
         self.pos_embed = pos_encoding.PositionEmbedding(block_size, embed_dim, 0.0, False)
-
         self.block_size = block_size
-
         self.apply(self._init_weights)
-
+        
+        ## codebook init
+        self.codebook = nn.Parameter(pre_trained_codebook)
+                    
     def get_block_size(self):
         return self.block_size
 
@@ -158,8 +161,16 @@ class CrossCondTransBase(nn.Module):
             b, t = idx.size()
             assert t <= self.block_size, "Cannot forward, model block size is exhausted."
             # forward the Trans model
+
+            # random initialized embbeding table
             token_embeddings = self.tok_emb(idx)
-            token_embeddings = torch.cat([self.cond_emb(clip_feature).unsqueeze(1), token_embeddings], dim=1)
+            
+            # codebook embbeding
+            token_embeddings = torch.index_select(codebook, 0, idx.reshape(-1)).reshape(idx.size(0), idx.size(1), -1)
+            
+            token_embeddings = torch.cat([self.cond_emb(clip_feature).unsqueeze(1), token_embeddings], dim=1) ## output of cond_emb is (batch_size, embed_dim), unsqueeze(1) => (batch_size, 1, embed_dim)
+            #concatenate with dim=1 => 
+
             
         x = self.pos_embed(token_embeddings)
         x = self.blocks(x)
